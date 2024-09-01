@@ -1,7 +1,14 @@
 import React from "react";
+import Header from "./Header";
 
 const Browse = () => {
-  return <div>This is Browse.</div>;
+  return (
+    <div>
+      <div className="w-full bg-black h-20 flex items-center justify-between">
+        <Header />
+      </div>
+    </div>
+  );
 };
 
 export default Browse;

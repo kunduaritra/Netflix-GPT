@@ -1,13 +1,26 @@
 import React, { useState, useRef } from "react";
 import Header from "./Header";
 import { validateCredentials } from "../utils/validate";
+import {
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  sendPasswordResetEmail,
+  updateProfile,
+} from "firebase/auth";
+import { auth } from "../utils/firebase";
+import { useNavigate } from "react-router-dom";
+import { useDispatch } from "react-redux";
+import { addUser } from "../utils/store/userSlice";
 
 const Login = () => {
   const [isSignUp, setIsSignUp] = useState(false);
   const [isForgetPassword, setIsForgetPassword] = useState(false);
-  const [message, setMessage] = useState(null);
+  const [errorMessage, setErrorMessage] = useState(null);
+  const name = useRef();
   const email = useRef();
   const password = useRef();
+  const navigate = useNavigate();
+  const dispatch = useDispatch();
 
   const toggleSignUp = () => {
     setIsSignUp(!isSignUp);
@@ -19,12 +32,80 @@ const Login = () => {
   };
 
   const handleSignBtn = () => {
+    console.log("Ecexuted a");
     if (!isForgetPassword) {
       const responseValidation = validateCredentials(
         email.current.value,
         password.current.value
       );
-      setMessage(responseValidation);
+
+      if (responseValidation !== null) {
+        setErrorMessage(responseValidation);
+        return;
+      }
+      if (isSignUp) {
+        createUserWithEmailAndPassword(
+          auth,
+          email.current.value,
+          password.current.value
+        )
+          .then((userCredential) => {
+            // Signed up
+            const user = userCredential.user;
+            updateProfile(auth.currentUser, {
+              displayName: name.current.value,
+            })
+              .then(() => {
+                const { uid, email, displayName } = auth.currentUser;
+                dispatch(
+                  addUser({ uid: uid, email: email, displayName: displayName })
+                );
+                navigate("/browse");
+              })
+              .catch((error) => {
+                setErrorMessage(error);
+              });
+          })
+          .catch((error) => {
+            const errorCode = error.code;
+            const errorMessage = error.message;
+            setErrorMessage(errorCode + " : " + errorMessage);
+            // ..
+          });
+        setErrorMessage(responseValidation);
+      } else {
+        // Sign In Code
+        signInWithEmailAndPassword(
+          auth,
+          email.current.value,
+          password.current.value
+        )
+          .then((userCredential) => {
+            // Signed in
+            const user = userCredential.user;
+            navigate("/browse");
+            // ...
+          })
+          .catch((error) => {
+            const errorCode = error.code;
+            const errorMessage = error.message;
+            setErrorMessage(errorCode + " : " + errorMessage);
+          });
+      }
+
+      setErrorMessage(null);
+    }
+    if (isForgetPassword) {
+      sendPasswordResetEmail(auth, email.current.value)
+        .then((response) => {
+          setErrorMessage("Password reset email sent!");
+        })
+        .catch((error) => {
+          const errorCode = error.code;
+          const errorMessage = error.message;
+          setErrorMessage(errorCode + " : " + errorMessage);
+          // ..
+        });
     }
   };
   return (
@@ -48,6 +129,7 @@ const Login = () => {
           </h2>
           {isSignUp && !isForgetPassword && (
             <input
+              ref={name}
               className="p-2 m-2 w-11/12 bg-black border border-gray-400 rounded-md"
               type="text"
               placeholder="Full Name"
@@ -67,10 +149,10 @@ const Login = () => {
               placeholder="Password"
             />
           )}
-          <p className="text-red-600 px-2 font-semibold">{message}</p>
+          <p className="text-red-600 px-2 font-semibold">{errorMessage}</p>
           <button
             onClick={handleSignBtn}
-            className="p-2 m-2 w-11/12 rounded-md bg-red-600 font-semibold text-white"
+            className="p-2 m-2 w-11/12 rounded-md bg-red-600 font-semibold text-white hover:bg-red-800"
           >
             {isSignUp && !isForgetPassword && "Sign Up"}
             {!isSignUp && !isForgetPassword && "Sign In"}
